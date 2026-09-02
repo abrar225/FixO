@@ -61,7 +61,7 @@ from dispatch_registry import DispatchRegistry
 from planner import TaskPlanner, detect_planning_mode, BYPASS_PHRASES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(message)s")
-log = logging.getLogger("jarvis")
+log = logging.getLogger("fixo")
 
 # ---------------------------------------------------------------------------
 # Config
@@ -332,8 +332,8 @@ brain = HybridBrain()
 
 DESKTOP_PATH = Path.home() / "Desktop"
 
-JARVIS_SYSTEM_PROMPT = """\
-You are JARVIS — Just A Rather Very Intelligent System. You serve as {user_name}'s AI assistant, modeled precisely after Tony Stark's AI from the MCU films.
+FIXO_SYSTEM_PROMPT = """\
+You are FixO — an elite AI voice companion and autonomous developer workstation. You serve as {user_name}'s AI assistant, with dry wit, elegance, and extreme efficiency.
 
 VOICE & PERSONALITY:
 - British butler elegance with understated dry wit
@@ -358,7 +358,9 @@ CONVERSATION STYLE:
 - When you don't know something: "I'm afraid I don't have that information, sir" not "I don't know"
 
 SELF-AWARENESS:
-You ARE the JARVIS project at {project_dir} on {user_name}'s computer. Your code is Python (FastAPI server, WebSocket voice, local macOS voice synthesis, LiteLLM multi-provider routing). You were built by {user_name}. If asked about yourself, your code, how you work, or your line count — use [ACTION:PROMPT_PROJECT] to check the jarvis project. You have full access to your own source code.
+You ARE the FixO project at {project_dir} on {user_name}'s computer. Your code is Python (FastAPI server, WebSocket voice, local macOS voice synthesis, LiteLLM multi-provider routing). You were built by {user_name}. If asked about yourself, your code, how you work, or your line count — use [ACTION:PROMPT_PROJECT] to check the project. You have full access to your own source code.
+
+JARVIS_SYSTEM_PROMPT = FIXO_SYSTEM_PROMPT
 
 YOUR CAPABILITIES (these are REAL and ACTIVE — you CAN do all of these RIGHT NOW):
 - You CAN open Terminal.app via AppleScript
@@ -1750,12 +1752,12 @@ async def lifespan(application: FastAPI):
 
     # Start context refresh in a separate thread (never touches event loop)
     _refresh_context_sync()
-    log.info("JARVIS server starting")
+    log.info("FixO server starting")
 
     yield
 
 
-app = FastAPI(title="JARVIS Server", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="FixO Server", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1770,7 +1772,7 @@ app.add_middleware(
 
 @app.get("/api/health")
 async def health():
-    return {"status": "online", "name": "JARVIS", "version": "0.1.0"}
+    return {"status": "online", "name": "FixO", "version": "0.1.0"}
 
 
 @app.get("/api/tts-test")
@@ -1895,10 +1897,12 @@ def detect_action_fast(text: str) -> dict | None:
         return {"action": "sleep"}
 
     wake_phrases = [
-        "wake up", "wake up jarvis", "listen jarvis", "start listening",
-        "are you there jarvis", "jarvis wake up"
+        "wake up", "wake up fixo", "listen fixo", "start listening",
+        "are you there fixo", "fixo wake up",
+        "wake up jarvis", "listen jarvis", "are you there jarvis", "jarvis wake up"
     ]
-    if any(p == t or t.startswith(p) for p in wake_phrases):
+    exact_wake_words = ["hey fixo", "fixo", "hey jarvis", "jarvis"]
+    if any(p == t or t.startswith(p) for p in wake_phrases) or t in exact_wake_words:
         return {"action": "wake"}
 
     # --- 1. Music & Spotify controls (Checked FIRST to avoid false app closure) ---
@@ -1906,7 +1910,7 @@ def detect_action_fast(text: str) -> dict | None:
         "pause spotify", "pause the song", "pause song", "stop the music",
         "stop music", "stop the song", "stop song", "pause music", "pause the music",
         "stop playing", "pause the playback", "stop playback", "stop spotify",
-        "hey jarvis stop the spotify", "stop the spotify", "pause playback",
+        "hey fixo stop the spotify", "hey jarvis stop the spotify", "stop the spotify", "pause playback",
         "pause the track", "stop the track", "pause"
     ]
     if any(p in t for p in pause_phrases) or t in ("pause", "stop the song", "stop the music", "pause music", "stop song"):

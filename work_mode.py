@@ -43,7 +43,7 @@ def select_default_engine() -> str | None:
 def build_task_brief(task_prompt: str) -> str:
     """Compile a neutral task brief for coding engines."""
     return (
-        "# JARVIS Task\n\n"
+        "# FixO Task\n\n"
         f"{task_prompt.strip()}\n\n"
         "## Expectations\n"
         "- Start building immediately unless the task is genuinely ambiguous.\n"
@@ -206,7 +206,7 @@ class OllamaEngine(CodingEngine):
 
         history_text = "\n".join(history_lines) if history_lines else "(start of session)"
         return (
-            "You are JARVIS's coding engine working inside a local project.\n"
+            "You are FixO's coding engine working inside a local project.\n"
             "Be decisive. Write code, inspect files, and answer with concrete results.\n"
             "If a task is ambiguous, choose the simplest reasonable approach.\n\n"
             f"PROJECT: {self.project_name}\n"

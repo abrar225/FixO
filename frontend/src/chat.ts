@@ -80,7 +80,7 @@ export function initChatPanel(onSendMessage?: (text: string) => void) {
             </button>
             <div class="chat-orb-mini"></div>
             <div class="chat-header-text">
-              <h2>JARVIS Command & Intelligence Log</h2>
+              <h2>FixO Command & Intelligence Log</h2>
               <span class="chat-session-subtitle" id="chat-session-subtitle">Active Session</span>
             </div>
           </div>
@@ -517,7 +517,7 @@ export function downloadCodeFile(code: string, lang: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `jarvis-artifact-${Date.now()}.${ext}`;
+  a.download = `fixo-artifact-${Date.now()}.${ext}`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -534,7 +534,8 @@ export async function sendTypedMessage(text: string) {
     if (res.ok) {
       const data = await res.json();
       if (data.user_message) addChatMessage(data.user_message);
-      if (data.jarvis_message) addChatMessage(data.jarvis_message);
+      if (data.fixo_message) addChatMessage(data.fixo_message);
+      else if (data.jarvis_message) addChatMessage(data.jarvis_message);
     }
   } catch (err) {
     console.error("Failed to send typed message:", err);

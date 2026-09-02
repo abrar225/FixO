@@ -1,11 +1,11 @@
 #!/bin/bash
-# JARVIS — 1-Click Startup Script
+# FixO — 1-Click Startup Script
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 
 echo "=========================================="
-echo " Starting JARVIS Voice AI Assistant...    "
+echo " Starting FixO Voice AI Assistant...      "
 echo "=========================================="
 
 # 1. Ensure Ollama is running
@@ -43,12 +43,12 @@ cd "$DIR"
 # Wait a moment for Vite dev server
 sleep 1.5
 
-# 4. Open Google Chrome to JARVIS
-echo "Opening JARVIS in Google Chrome..."
+# 4. Open Google Chrome to FixO
+echo "Opening FixO in Google Chrome..."
 open -a "Google Chrome" "http://localhost:5173"
 
 echo "=========================================="
-echo " JARVIS is active at http://localhost:5173"
+echo " FixO is active at http://localhost:5173  "
 echo " Press Ctrl+C in this terminal to stop.  "
 echo "=========================================="
 

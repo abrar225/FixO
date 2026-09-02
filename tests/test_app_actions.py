@@ -266,6 +266,18 @@ async def test_spotify_nlp_cleaning():
     assert "creative music" in res["confirmation"] or "Playing" in res["confirmation"]
 
 
+def test_fixo_wake_and_pause_detection():
+    assert detect_action_fast("wake up fixo") == {"action": "wake"}
+    assert detect_action_fast("hey fixo") == {"action": "wake"}
+    assert detect_action_fast("fixo") == {"action": "wake"}
+    assert detect_action_fast("listen fixo") == {"action": "wake"}
+
+    act = detect_action_fast("hey fixo stop the spotify")
+    assert act is not None
+    assert act["action"] == "spotify"
+    assert act["target"] == "pause"
+
+
 
 
 

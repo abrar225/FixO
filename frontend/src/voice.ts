@@ -19,6 +19,11 @@ export interface VoiceInput {
 declare const webkitSpeechRecognition: any;
 
 const WAKE_PHRASES = [
+  "hey fixo",
+  "fixo",
+  "listen fixo",
+  "wake up fixo",
+  "are you there fixo",
   "hey jarvis",
   "jarvis",
   "listen jarvis",

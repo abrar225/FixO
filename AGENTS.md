@@ -1,7 +1,7 @@
-# JARVIS — Voice AI Assistant
+# FixO — Voice AI Assistant
 
 ## Overview
-JARVIS (Just A Rather Very Intelligent System) is a voice-first AI assistant for macOS. It runs locally on your machine, connects to Apple Calendar, Mail, and Notes, and can open coding workspaces with OpenCode or Ollama for development tasks.
+FixO is a voice-first AI assistant and autonomous developer workstation for macOS. It runs locally on your machine, connects to Apple Calendar, Mail, and Notes, and can open coding workspaces with OpenCode or Ollama for development tasks.
 
 ## Quick Start
 When a user clones this repo and starts Codex, help them:
@@ -15,7 +15,7 @@ When a user clones this repo and starts Codex, help them:
 8. Run the backend: `python server.py --port 8340`
 9. Run the frontend: `cd frontend && npm run dev`
 10. Open Chrome to `http://localhost:5173`
-11. Click to enable audio, speak to JARVIS
+11. Click to enable audio, speak to FixO
 
 ## Architecture
 - **Backend**: FastAPI + Python (`server.py`)
@@ -48,14 +48,14 @@ When a user clones this repo and starts Codex, help them:
 - `GROQ_API_KEY` (required) — Fast conversational routing
 - `GEMINI_API_KEY` (required) — Reasoning and vision routing
 - `NVIDIA_API_KEY` (optional) — Analytical/fallback routing
-- `USER_NAME` (optional) — Your name for JARVIS to use
+- `USER_NAME` (optional) — Your name for FixO to use
 - `CALENDAR_ACCOUNTS` (optional) — Comma-separated calendar emails
 - `OPENCODE_MODEL` (optional) — Override the OpenCode model
 - `OLLAMA_MODEL` (optional) — Override the Ollama model
 - `OLLAMA_HOST` (optional) — Remote Ollama host
 
 ## Conventions
-- JARVIS personality: British butler, dry wit, economy of language
+- FixO personality: British butler, dry wit, economy of language
 - Max 1-2 sentences per voice response
 - Action tags: `[ACTION:BUILD]`, `[ACTION:BROWSE]`, `[ACTION:RESEARCH]`, etc.
 - AppleScript for all macOS integrations

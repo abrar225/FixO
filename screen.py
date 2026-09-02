@@ -190,7 +190,7 @@ async def describe_screen(brain) -> str:
         if screenshot_b64:
             try:
                 system = (
-                    "You are JARVIS, Tony Stark's AI assistant. "
+                    "You are FixO — an elite AI voice assistant. "
                     "Analyze this screenshot and describe what is on the screen in 1-2 concise, elegant sentences. "
                     "Address the user as sir. Never output thinking or markdown."
                 )
@@ -240,7 +240,7 @@ async def describe_screen(brain) -> str:
     if context_parts:
         try:
             system = (
-                "You are JARVIS, Tony Stark's AI assistant. "
+                "You are FixO — an elite AI voice assistant. "
                 "Summarize what the user is working on based on the open windows and apps in 1-2 concise sentences. "
                 "Address the user as sir. Do not output markdown or thinking traces."
             )

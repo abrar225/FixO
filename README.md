@@ -1,8 +1,8 @@
-# JARVIS
+# FixO
 
-**Just A Rather Very Intelligent System.**
+**Your Voice-First AI Companion & Autonomous Developer Workstation.**
 
-JARVIS is a voice-first AI assistant for macOS. It listens through the browser, responds with speech, watches your calendar/mail/notes, and can open local coding workspaces with OpenCode or Ollama when you want development work done.
+FixO is a voice-first AI assistant for macOS. It listens through the browser, responds with speech, watches your calendar/mail/notes, and can open local coding workspaces with OpenCode or Ollama when you want development work done.
 
 ## What It Does
 
@@ -28,8 +28,8 @@ JARVIS is a voice-first AI assistant for macOS. It listens through the browser, 
 ## Quick Start
 
 ```bash
-git clone https://github.com/yourusername/jarvis.git
-cd jarvis
+git clone https://github.com/abrar225/FixO.git
+cd FixO
 cp .env.example .env
 ```
 

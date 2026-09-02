@@ -24,10 +24,19 @@ try:
 except ImportError:
     nx = None
 
-log = logging.getLogger("jarvis.memory_graph")
+log = logging.getLogger("fixo.memory_graph")
 
 DATA_DIR = Path(__file__).parent / "data"
-DB_PATH = DATA_DIR / "jarvis.db"
+DB_PATH = DATA_DIR / "fixo.db"
+LEGACY_DB_PATH = DATA_DIR / "jarvis.db"
+
+if not DB_PATH.exists() and LEGACY_DB_PATH.exists():
+    try:
+        import shutil
+        shutil.copy2(LEGACY_DB_PATH, DB_PATH)
+    except Exception:
+        DB_PATH = LEGACY_DB_PATH
+
 GRAPH_JSON_PATH = DATA_DIR / "knowledge_graph.json"
 GRAPHIFY_DIR = Path(__file__).parent / "graphify-out"
 

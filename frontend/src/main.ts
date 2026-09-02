@@ -39,7 +39,7 @@ function updateStatus(state: State) {
     listening: "listening...",
     thinking: "thinking...",
     speaking: "",
-    sleeping: "sleeping — say 'hey jarvis' or clap 3x",
+    sleeping: "sleeping — say 'hey fixo' or clap 3x",
   };
   statusEl.textContent = labels[state];
 }
@@ -63,8 +63,8 @@ orb.setAnalyser(audioPlayer.getAnalyser());
 const clapDetector = createClapDetector(
   audioCtx,
   () => {
-    // 3 claps detected! Wake up JARVIS
-    console.log("[main] Triple clap detected! Waking up JARVIS...");
+    // 3 claps detected! Wake up FixO
+    console.log("[main] Triple clap detected! Waking up FixO...");
     wakeUp("clap");
   },
   (count) => {
@@ -72,7 +72,7 @@ const clapDetector = createClapDetector(
       statusEl.textContent = `clap detected (${count}/3)...`;
       setTimeout(() => {
         if (currentState === "sleeping") {
-          statusEl.textContent = "sleeping — say 'hey jarvis' or clap 3x";
+          statusEl.textContent = "sleeping — say 'hey fixo' or clap 3x";
         }
       }, 1200);
     }

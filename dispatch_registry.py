@@ -12,13 +12,22 @@ import sqlite3
 import time
 from pathlib import Path
 
-log = logging.getLogger("jarvis.dispatch")
+log = logging.getLogger("fixo.dispatch")
 
-DB_PATH = Path(__file__).parent / "data" / "jarvis.db"
+DATA_DIR = Path(__file__).parent / "data"
+DB_PATH = DATA_DIR / "fixo.db"
+LEGACY_DB_PATH = DATA_DIR / "jarvis.db"
+
+if not DB_PATH.exists() and LEGACY_DB_PATH.exists():
+    try:
+        import shutil
+        shutil.copy2(LEGACY_DB_PATH, DB_PATH)
+    except Exception:
+        DB_PATH = LEGACY_DB_PATH
 
 
 def _get_db() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")

@@ -68,7 +68,7 @@ function buildPanelHTML(): string {
       </div>
 
       <div class="settings-welcome" id="settings-welcome" style="display:none">
-        <p>Welcome to JARVIS. Let's wire up the hybrid brain.</p>
+        <p>Welcome to FixO. Let's wire up the hybrid brain.</p>
       </div>
 
       <div class="settings-body">
