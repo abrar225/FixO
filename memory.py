@@ -402,18 +402,35 @@ def format_plan_for_voice(tasks: list[dict], events: list[dict]) -> str:
 # Memory extraction — learn from conversations
 # ---------------------------------------------------------------------------
 
-async def extract_memories(user_text: str, jarvis_response: str, anthropic_client) -> list[str]:
-    """After a conversation turn, extract any facts worth remembering.
+async def extract_memories(user_text: str, jarvis_response: str, brain) -> list[str]:
+    """After a conversation turn, extract any facts worth remembering."""
+    if not user_text or len(user_text) < 15:
+        return []
 
-    Uses Haiku to decide if anything in the exchange is worth storing.
-    Returns list of memories stored.
-    """
-    if not anthropic_client or len(user_text) < 15:
+    # Fast rule-based extraction for explicit memory cues (works instantly, no LLM lag)
+    lower = user_text.lower()
+    memory_cues = ["remember that", "keep in mind that", "my name is", "my email is", "i prefer", "always use", "never use"]
+    for cue in memory_cues:
+        if cue in lower:
+            fact = user_text[lower.find(cue):].strip()
+            if len(fact) > 5:
+                remember(
+                    content=fact,
+                    mem_type="preference" if "prefer" in cue or "use" in cue else "fact",
+                    source=user_text[:50],
+                    importance=8,
+                )
+                return [fact]
+
+    # If running in local brain mode, skip background LLM extraction to keep Ollama responsive
+    from server import USE_LOCAL_BRAIN, GEMINI_API_KEY
+    if USE_LOCAL_BRAIN or not GEMINI_API_KEY or not brain:
         return []
 
     try:
-        response = await anthropic_client.messages.create(
-            model="claude-haiku-4-5-20251001",
+        from server import VISION_MODEL
+        response = await brain.generate(
+            model=VISION_MODEL,
             max_tokens=200,
             system=(
                 "Extract facts worth remembering from this conversation. "
@@ -425,8 +442,7 @@ async def extract_memories(user_text: str, jarvis_response: str, anthropic_clien
             messages=[{"role": "user", "content": f"User: {user_text}\nJARVIS: {jarvis_response}"}],
         )
 
-        text = response.content[0].text.strip()
-        # Parse JSON
+        text = response.choices[0].message.content.strip()
         if text.startswith("["):
             items = json.loads(text)
             stored = []

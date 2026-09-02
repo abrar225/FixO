@@ -5,6 +5,8 @@ Strategy: fetch all events per-calendar in parallel (bulk property access),
 filter dates in Python. Results cached and refreshed in background.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
@@ -45,22 +47,8 @@ end tell
 
 
 async def _ensure_calendar_running():
-    """Launch Calendar.app if not already running."""
-    global _calendar_launched
-    if _calendar_launched:
-        return
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "open", "-a", "Calendar", "-g",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        await asyncio.wait_for(proc.communicate(), timeout=5)
-        await asyncio.sleep(2)
-        _calendar_launched = True
-        log.info("Calendar.app launched")
-    except Exception as e:
-        log.warning(f"Failed to launch Calendar: {e}")
+    """No-op: do not auto-launch Calendar.app in background."""
+    pass
 
 
 async def _fetch_calendar_events(cal_name: str, timeout: float = 12.0) -> list[dict]:
@@ -266,3 +254,60 @@ def format_schedule_summary(events: list[dict]) -> str:
     if count > 3:
         result += f". And {count - 3} more."
     return result
+
+
+async def create_calendar_event(title: str, time_str: str = "", duration_minutes: int = 30, description: str = "") -> dict:
+    """Create a new event in Apple Calendar via AppleScript."""
+    import re
+    await _ensure_calendar_running()
+
+    target_hour = 15
+    target_minute = 0
+
+    if time_str:
+        t_clean = time_str.lower().replace(".", "").strip()
+        m = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(am|pm)?', t_clean)
+        if m:
+            h = int(m.group(1))
+            m_min = int(m.group(2)) if m.group(2) else 0
+            meridiem = m.group(3)
+            if meridiem == "pm" and h < 12:
+                h += 12
+            elif meridiem == "am" and h == 12:
+                h = 0
+            target_hour = h
+            target_minute = m_min
+
+    clean_title = title.replace('"', '\\"').strip()
+    clean_desc = description.replace('"', '\\"').strip() if description else "Scheduled by JARVIS"
+
+    script = f'''
+    tell application "Calendar"
+        tell (first calendar whose writable is true)
+            set nowD to current date
+            set hours of nowD to {target_hour}
+            set minutes of nowD to {target_minute}
+            set seconds of nowD to 0
+            set endD to nowD + ({duration_minutes} * 60)
+            make new event with properties {{summary:"{clean_title}", start date:nowD, end date:endD, description:"{clean_desc}"}}
+            return "ok"
+        end tell
+    end tell
+    '''
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "osascript", "-e", script,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=8)
+        if proc.returncode == 0 and "ok" in stdout.decode():
+            global _cache_time
+            _cache_time = 0
+            time_display = f"{target_hour % 12 or 12}:{target_minute:02d} {'PM' if target_hour >= 12 else 'AM'}"
+            return {"success": True, "confirmation": f"Scheduled '{title}' for {time_display} today, sir."}
+    except Exception as e:
+        log.warning(f"Failed to create calendar event: {e}")
+
+    return {"success": False, "confirmation": "I couldn't create the calendar event, sir."}
+

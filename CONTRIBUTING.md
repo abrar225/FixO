@@ -32,7 +32,7 @@ Yes, `server.py` is a 2400-line monolith. It works. If you want to refactor part
 ## What NOT to Do
 
 - Don't add telemetry or analytics
-- Don't send data to external services beyond the existing API calls (Anthropic, Fish Audio)
+- Don't send data to external services beyond the existing API calls (Groq, Gemini, NVIDIA)
 - Don't add features that modify or delete user data in connected services (Mail, Calendar, Notes)
 - Don't break the existing voice loop
 

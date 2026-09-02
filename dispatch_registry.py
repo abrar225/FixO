@@ -5,6 +5,8 @@ Persists to SQLite so JARVIS always knows what he's working on,
 what just finished, and what the user is likely referring to.
 """
 
+from __future__ import annotations
+
 import logging
 import sqlite3
 import time

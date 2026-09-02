@@ -11,20 +11,57 @@ export interface VoiceInput {
   stop(): void;
   pause(): void;
   resume(): void;
+  setSleeping(sleeping: boolean): void;
+  isSleeping(): boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const webkitSpeechRecognition: any;
 
+const WAKE_PHRASES = [
+  "hey jarvis",
+  "jarvis",
+  "listen jarvis",
+  "wake up",
+  "wake up jarvis",
+  "start listening",
+  "are you there jarvis",
+];
+
+const SLEEP_PHRASES = [
+  "shut up",
+  "shut the fuck up",
+  "stop listening",
+  "go to sleep",
+  "be quiet",
+  "turn off mic",
+  "turn off the mic",
+  "turn your mic off",
+  "stay idle",
+  "mute",
+  "sleep",
+];
+
 export function createVoiceInput(
   onTranscript: (text: string) => void,
-  onError: (msg: string) => void
+  onError: (msg: string) => void,
+  callbacks?: {
+    onWakeWord?: (wakePhrase: string) => void;
+    onSleepCommand?: (sleepPhrase: string) => void;
+  }
 ): VoiceInput {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const SR = (window as any).SpeechRecognition || (typeof webkitSpeechRecognition !== "undefined" ? webkitSpeechRecognition : null);
   if (!SR) {
     onError("Speech recognition not supported in this browser");
-    return { start() {}, stop() {}, pause() {}, resume() {} };
+    return {
+      start() {},
+      stop() {},
+      pause() {},
+      resume() {},
+      setSleeping() {},
+      isSleeping: () => false,
+    };
   }
 
   const recognition = new SR();
@@ -34,12 +71,56 @@ export function createVoiceInput(
 
   let shouldListen = false;
   let paused = false;
+  let sleeping = false;
+
+  function matchesWakeWord(text: string): string | null {
+    const t = text.toLowerCase().trim();
+    for (const phrase of WAKE_PHRASES) {
+      if (t === phrase || t.startsWith(phrase + " ") || t.endsWith(" " + phrase) || t.includes(" " + phrase + " ")) {
+        return phrase;
+      }
+    }
+    return null;
+  }
+
+  function matchesSleepCommand(text: string): string | null {
+    const t = text.toLowerCase().trim();
+    for (const phrase of SLEEP_PHRASES) {
+      if (t === phrase || t.startsWith(phrase + " ") || t.endsWith(" " + phrase) || t.includes(" " + phrase + " ")) {
+        return phrase;
+      }
+    }
+    return null;
+  }
 
   recognition.onresult = (event: any) => {
     for (let i = event.resultIndex; i < event.results.length; i++) {
-      if (event.results[i].isFinal) {
-        const text = event.results[i][0].transcript.trim();
-        if (text) onTranscript(text);
+      const isFinal = Boolean(event.results[i].isFinal);
+      const text = event.results[i][0].transcript.trim();
+      if (!text) continue;
+
+      if (sleeping) {
+        // In sleep mode: only wake up on final wake word match
+        if (isFinal) {
+          const wakeMatch = matchesWakeWord(text);
+          if (wakeMatch) {
+            console.log(`[voice] Wake word detected: "${wakeMatch}"`);
+            sleeping = false;
+            callbacks?.onWakeWord?.(wakeMatch);
+          }
+        }
+      } else {
+        // In active mode: check for sleep commands on final transcript
+        if (isFinal) {
+          const sleepMatch = matchesSleepCommand(text);
+          if (sleepMatch) {
+            console.log(`[voice] Sleep command detected: "${sleepMatch}"`);
+            sleeping = true;
+            callbacks?.onSleepCommand?.(sleepMatch);
+            return;
+          }
+          onTranscript(text);
+        }
       }
     }
   };
@@ -96,6 +177,10 @@ export function createVoiceInput(
         }
       }
     },
+    setSleeping(val: boolean) {
+      sleeping = val;
+    },
+    isSleeping: () => sleeping,
   };
 }
 

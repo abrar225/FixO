@@ -6,11 +6,15 @@ Two capabilities:
 2. Screenshot via screencapture → Claude vision API (sees everything)
 """
 
+from __future__ import annotations
+
 import asyncio
 import base64
 import json
 import logging
+import os
 import tempfile
+import time
 from pathlib import Path
 
 log = logging.getLogger("jarvis.screen")
@@ -151,48 +155,69 @@ async def take_screenshot(display_only: bool = True) -> str | None:
             pass
 
 
-async def describe_screen(anthropic_client) -> str:
-    """Describe what's on the user's screen.
+async def save_screenshot_to_desktop(filename: str = "") -> dict:
+    """Take a screenshot and save it directly to the Desktop."""
+    desktop = Path.home() / "Desktop"
+    if not filename:
+        filename = f"JARVIS_Screenshot_{int(time.time())}.png"
+    if not filename.endswith(".png"):
+        filename += ".png"
+    out_path = desktop / filename
 
-    Tries screenshot + vision first. Falls back to window list + LLM summary.
-    """
-    # Try screenshot + vision
-    screenshot_b64 = await take_screenshot()
-    if screenshot_b64 and anthropic_client:
-        try:
-            response = await anthropic_client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=300,
-                system=(
-                    "You are JARVIS analyzing a screenshot of the user's desktop. "
-                    "Describe what you see concisely: which apps are open, what the user "
-                    "appears to be working on, any notable content visible. "
-                    "Be specific about app names, file names, URLs, code, or documents visible. "
-                    "2-4 sentences max. No markdown."
-                ),
-                messages=[{
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/png",
-                                "data": screenshot_b64,
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "screencapture", "-x", "-m", str(out_path),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await asyncio.wait_for(proc.communicate(), timeout=8)
+        if proc.returncode == 0 and out_path.exists():
+            return {"success": True, "path": str(out_path), "confirmation": f"Saved screenshot to your Desktop as {filename}, sir."}
+    except Exception as e:
+        log.warning(f"save_screenshot_to_desktop error: {e}")
+
+    return {"success": False, "path": None, "confirmation": "Could not capture screenshot, sir."}
+
+
+async def describe_screen(brain) -> str:
+    """Describe what's on the user's screen using the Hybrid Brain."""
+    use_local = os.getenv("USE_LOCAL_BRAIN", "false").lower() == "true"
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+
+    # If cloud vision is explicitly available and not local mode, try screenshot + vision
+    if not use_local and gemini_key:
+        screenshot_b64 = await take_screenshot()
+        if screenshot_b64:
+            try:
+                system = (
+                    "You are JARVIS, Tony Stark's AI assistant. "
+                    "Analyze this screenshot and describe what is on the screen in 1-2 concise, elegant sentences. "
+                    "Address the user as sir. Never output thinking or markdown."
+                )
+                response = await brain.generate(
+                    system=system,
+                    max_tokens=200,
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "What's on my screen right now?",
                             },
-                        },
-                        {
-                            "type": "text",
-                            "text": "What's on my screen right now?",
-                        },
-                    ],
-                }],
-            )
-            return response.content[0].text
-        except Exception as e:
-            log.warning(f"Vision call failed, falling back to window list: {e}")
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{screenshot_b64}"
+                                },
+                            },
+                        ],
+                    }],
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                log.warning(f"Vision call failed, falling back to window list: {e}")
 
-    # Fallback: get window list and have LLM summarize
+    # Fallback / Local mode: get window list and have local LLM summarize
     windows = await get_active_windows()
     apps = await get_running_apps()
 
@@ -212,20 +237,21 @@ async def describe_screen(anthropic_client) -> str:
         if bg_apps:
             context_parts.append(f"Background apps: {', '.join(bg_apps)}")
 
-    if anthropic_client and context_parts:
+    if context_parts:
         try:
-            response = await anthropic_client.messages.create(
-                model="claude-haiku-4-5-20251001",
+            system = (
+                "You are JARVIS, Tony Stark's AI assistant. "
+                "Summarize what the user is working on based on the open windows and apps in 1-2 concise sentences. "
+                "Address the user as sir. Do not output markdown or thinking traces."
+            )
+            response = await brain.generate(
+                system=system,
                 max_tokens=100,
-                system=(
-                    "You are JARVIS. Given the user's open windows and apps, summarize "
-                    "what they appear to be working on in 1-2 sentences. Natural voice, no markdown."
-                ),
                 messages=[{"role": "user", "content": "Open windows:\n" + "\n".join(context_parts)}],
             )
-            return response.content[0].text
-        except Exception:
-            pass
+            return response.choices[0].message.content
+        except Exception as e:
+            log.warning(f"Screen text summary generation failed: {e}")
 
     # Raw fallback
     if windows:

@@ -5,6 +5,8 @@ Each template is a format string with named placeholders.
 Templates are matched by task type and optionally by keyword analysis.
 """
 
+from __future__ import annotations
+
 TEMPLATES = {
     "landing_page": {
         "task_type": "build",

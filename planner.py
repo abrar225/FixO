@@ -1,5 +1,5 @@
 """
-JARVIS Task Planner — Conversational planning before spawning Claude Code.
+JARVIS Task Planner — Conversational planning before spawning a coding workspace.
 
 Handles:
 1. Planning mode detection (distinguish "build me X" from "what time is it")
@@ -9,13 +9,13 @@ Handles:
 5. Structured prompt building from templates + context + answers
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
-
-import anthropic
 
 from templates import TEMPLATES, get_template
 
@@ -65,14 +65,14 @@ class PlanningDecision:
 
 async def detect_planning_mode(
     user_text: str,
-    client: Optional[anthropic.AsyncAnthropic] = None,
+    client: Optional[object] = None,
     force_bypass: bool = False,
 ) -> PlanningDecision:
     """Classify a user request as simple (execute now) or complex (needs planning).
 
     Args:
         user_text: The raw user request.
-        client: Anthropic async client for Haiku classification.
+        client: Optional async client for richer classification.
         force_bypass: If True, skip planning and apply smart defaults.
 
     Returns:
@@ -124,12 +124,12 @@ def _quick_classify(text: str) -> str:
 
 
 async def _classify_planning_mode_llm(
-    text: str, client: anthropic.AsyncAnthropic
+    text: str, client: object
 ) -> PlanningDecision:
     """Use Haiku to classify request and identify missing info."""
     try:
-        response = await client.messages.create(
-            model="claude-haiku-4-5-20251001",
+        response = await client.generate(
+            model="groq/llama-3.3-70b-versatile",
             max_tokens=400,
             system=(
                 "You analyze development requests to decide if they need planning.\n"
@@ -158,7 +158,7 @@ async def _classify_planning_mode_llm(
             ),
             messages=[{"role": "user", "content": text}],
         )
-        raw = response.content[0].text.strip()
+        raw = response.choices[0].message.content.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
         data = json.loads(raw)
@@ -385,7 +385,7 @@ async def gather_project_context(project_path: str) -> dict:
 # ---------------------------------------------------------------------------
 
 class TaskPlanner:
-    """Manages the planning conversation before spawning Claude Code."""
+    """Manages the planning conversation before spawning a coding workspace."""
 
     def __init__(self):
         self.active_plan: Optional[Plan] = None
@@ -398,7 +398,7 @@ class TaskPlanner:
         self,
         user_request: str,
         projects: list[dict],
-        client: anthropic.AsyncAnthropic,
+        client: object,
     ) -> dict:
         """Analyze request and determine what questions to ask.
 
@@ -615,7 +615,7 @@ class TaskPlanner:
         return summary
 
     async def build_prompt(self) -> str:
-        """Build the structured claude -p prompt from the finalized plan."""
+        """Build the structured task prompt from the finalized plan."""
         plan = self.active_plan
         if not plan:
             return ""
@@ -673,11 +673,11 @@ class TaskPlanner:
 
     # -- Private helpers --
 
-    async def _classify_request(self, text: str, client: anthropic.AsyncAnthropic) -> dict:
+    async def _classify_request(self, text: str, client: object) -> dict:
         """Use Haiku to classify request type and extract known info."""
         try:
-            response = await client.messages.create(
-                model="claude-haiku-4-5-20251001",
+            response = await client.generate(
+                model="groq/llama-3.3-70b-versatile",
                 max_tokens=300,
                 system=(
                     "Classify this development request. Respond with JSON only, no markdown.\n"
@@ -692,7 +692,7 @@ class TaskPlanner:
                 ),
                 messages=[{"role": "user", "content": text}],
             )
-            raw = response.content[0].text.strip()
+            raw = response.choices[0].message.content.strip()
             if raw.startswith("```"):
                 raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
             return json.loads(raw)

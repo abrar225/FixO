@@ -1,41 +1,59 @@
 # Environment
 .env
-.env.local
+.env.*
+!.env.example
 
 # Dependencies
 node_modules/
+frontend/node_modules/
+desktop-overlay/node_modules/
 .venv/
 venv/
+env/
 
 # Python
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
 
-# Data (user-specific, generated at runtime)
+# Data & Runtime State (user-specific)
+data/*
+!data/.gitkeep
 *.db
-data/*.jsonl
-data/active_session.json
-data/.jarvis_output.txt
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
 
-# Certificates
+# AI / IDE Internal State
+.lyzo/
+graphify-out/
+context/
+.arch/
+.claude/
+
+# Certificates & Secrets
 *.pem
+*.key
+*.crt
+*.p8
+*.p12
 
-# Build
+# Build Artifacts
 dist/
+frontend/dist/
 .vite/
 frontend/.vite/
 
-# IDE / System
+# Operating System & Editors
 .DS_Store
+**/.DS_Store
+._*
 .vscode/
 .idea/
-.claude/
-.arch/
-
-# Desktop overlay
-desktop-overlay/node_modules/
-context/
-*.db-shm
-*.db-wal
+.zed/

@@ -8,7 +8,7 @@
 
 import * as THREE from "three";
 
-export type OrbState = "idle" | "listening" | "thinking" | "speaking";
+export type OrbState = "idle" | "listening" | "thinking" | "speaking" | "sleeping";
 
 export interface Orb {
   setState(s: OrbState): void;
@@ -125,6 +125,9 @@ export function createOrb(canvas: HTMLCanvasElement): Orb {
     const t = clock.getElapsedTime();
 
     switch (state) {
+      case "sleeping":
+        targetRadius = 32; targetSpeed = 0.04; targetBright = 0.18; targetSize = 0.22;
+        targetLineAmount = 0.04; targetElectronRate = 0; break;
       case "idle":
         targetRadius = 28; targetSpeed = 0.2; targetBright = 0.5; targetSize = 0.35;
         targetLineAmount = 0.15; targetElectronRate = 0; break;

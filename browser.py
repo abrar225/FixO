@@ -7,7 +7,9 @@ Runs headless Chromium with realistic user agent to avoid blocking.
 
 import asyncio
 import logging
+import re
 import tempfile
+import urllib.parse
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Optional
@@ -77,13 +79,17 @@ class JarvisBrowser:
         from playwright.async_api import async_playwright
 
         self._pw = await async_playwright().start()
-        # Launch VISIBLE browser so user can watch JARVIS browse
-        self._browser = await self._pw.chromium.launch(headless=False)
+        try:
+            self._browser = await self._pw.chromium.launch(headless=False)
+        except Exception:
+            # Fallback to headless if GUI window permissions fail
+            self._browser = await self._pw.chromium.launch(headless=True)
+
         self._context = await self._browser.new_context(
             user_agent=USER_AGENT,
             viewport={"width": 1280, "height": 900},
         )
-        log.info("Browser launched (visible Chromium)")
+        log.info("Browser context established")
 
     async def _new_page(self):
         """Create a new page in the browser context."""
@@ -93,18 +99,18 @@ class JarvisBrowser:
     # -- Search ----------------------------------------------------------------
 
     async def search(self, query: str) -> list[SearchResult]:
-        """Search DuckDuckGo and return top results."""
-        page = await self._new_page()
+        """Search DuckDuckGo and return top results with fast HTTP fallback."""
         results = []
 
+        # 1. Try via Playwright
         try:
+            page = await self._new_page()
             await page.goto(
-                f"https://html.duckduckgo.com/html/?q={query}",
+                f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}",
                 timeout=TIMEOUT_MS,
                 wait_until="domcontentloaded",
             )
 
-            # Extract search results from DDG HTML version
             raw = await page.evaluate("""
                 () => {
                     const items = document.querySelectorAll('.result');
@@ -124,14 +130,40 @@ class JarvisBrowser:
                         snippet=r.get("snippet", ""),
                     ))
 
-            log.info(f"Search '{query}' returned {len(results)} results")
-            # Let user see the search results for a moment
-            await asyncio.sleep(2)
+            if results:
+                log.info(f"Playwright search '{query}' returned {len(results)} results")
+                return results
         except Exception as e:
-            log.warning(f"Search failed for '{query}': {e}")
-        finally:
-            # Don't close the page — keep it visible
-            pass
+            log.debug(f"Playwright search error ({e}), trying fast HTTP fallback...")
+
+        # 2. Resilient HTTP fallback with BeautifulSoup
+        try:
+            import httpx
+            from bs4 import BeautifulSoup
+            headers = {"User-Agent": USER_AGENT}
+            async with httpx.AsyncClient(timeout=6.0, follow_redirects=True) as client:
+                resp = await client.get(f"https://html.duckduckgo.com/html/?q={urllib.parse.quote(query)}", headers=headers)
+                if resp.status_code == 200:
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    items = soup.select(".result")
+                    for item in items[:6]:
+                        a_tag = item.select_one(".result__title a") or item.select_one(".result__a")
+                        snip_tag = item.select_one(".result__snippet")
+                        if a_tag and a_tag.get_text():
+                            title = a_tag.get_text().strip()
+                            raw_href = a_tag.get("href", "")
+                            # Parse DDG redirect url
+                            if "uddg=" in raw_href:
+                                m_url = re.search(r'uddg=([^&]+)', raw_href)
+                                actual_url = urllib.parse.unquote(m_url.group(1)) if m_url else raw_href
+                            else:
+                                actual_url = raw_href
+                            snippet = snip_tag.get_text().strip() if snip_tag else ""
+                            if title and actual_url.startswith("http"):
+                                results.append(SearchResult(title=title, url=actual_url, snippet=snippet))
+                    log.info(f"HTTP fallback search '{query}' returned {len(results)} results")
+        except Exception as err:
+            log.warning(f"HTTP search fallback failed: {err}")
 
         return results
 

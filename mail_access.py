@@ -8,6 +8,8 @@ IMPORTANT: This module is intentionally READ-ONLY.
 No send, delete, move, or modify functions exist by design.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from datetime import datetime
@@ -18,37 +20,8 @@ _mail_launched = False
 
 
 async def _ensure_mail_running():
-    """Launch Mail.app if not already running."""
-    global _mail_launched
-    if _mail_launched:
-        return
-
-    check = 'tell application "System Events" to return (name of every application process) contains "Mail"'
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "osascript", "-e", check,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=3)
-        if "true" in stdout.decode().lower():
-            _mail_launched = True
-            return
-    except Exception:
-        pass
-
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "open", "-a", "Mail", "-g",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        await asyncio.wait_for(proc.communicate(), timeout=5)
-        await asyncio.sleep(2)
-        _mail_launched = True
-        log.info("Mail.app launched")
-    except Exception as e:
-        log.warning(f"Failed to launch Mail: {e}")
+    """No-op: do not auto-launch Mail.app in background."""
+    pass
 
 
 async def _run_mail_script(script: str, timeout: float = 20) -> str:

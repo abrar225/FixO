@@ -5,13 +5,15 @@ Can read existing notes and create new ones.
 CANNOT edit or delete existing notes (safety).
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 
 log = logging.getLogger("jarvis.notes")
 
 
-async def _run_notes_script(script: str, timeout: float = 10) -> str:
+async def _run_notes_script(script: str, timeout: float = 10, quiet: bool = False) -> str:
     """Run an AppleScript against Notes.app."""
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -21,18 +23,21 @@ async def _run_notes_script(script: str, timeout: float = 10) -> str:
         )
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         if proc.returncode != 0:
-            log.warning(f"Notes script failed: {stderr.decode()[:200]}")
+            if not quiet:
+                log.warning(f"Notes script failed: {stderr.decode()[:200]}")
             return ""
         return stdout.decode().strip()
     except asyncio.TimeoutError:
-        log.warning("Notes script timed out")
+        if not quiet:
+            log.warning("Notes script timed out")
         return ""
     except Exception as e:
-        log.warning(f"Notes script error: {e}")
+        if not quiet:
+            log.warning(f"Notes script error: {e}")
         return ""
 
 
-async def get_recent_notes(count: int = 10) -> list[dict]:
+async def get_recent_notes(count: int = 10, quiet: bool = False) -> list[dict]:
     """Get most recent notes (title + creation date)."""
     script = f'''
 tell application "Notes"
@@ -44,13 +49,16 @@ tell application "Notes"
         set n to item i of allNotes
         set nName to name of n
         set nDate to creation date of n as string
-        set nFolder to name of container of n
+        set nFolder to "Unknown"
+        try
+            set nFolder to name of container of n
+        end try
         set output to output & nName & "|||" & nDate & "|||" & nFolder & linefeed
     end repeat
     return output
 end tell
 '''
-    raw = await _run_notes_script(script, timeout=15)
+    raw = await _run_notes_script(script, timeout=15, quiet=quiet)
     if not raw:
         return []
     notes = []

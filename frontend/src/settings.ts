@@ -1,16 +1,15 @@
 /**
  * JARVIS — Settings Panel
  *
- * Overlay panel for API keys, connection status, preferences, and system info.
- * Slides in from the right with glass-morphism styling.
+ * Overlay panel for provider keys, coding engine status, preferences, and
+ * system info.
  */
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 interface StatusResponse {
-  claude_code_installed: boolean;
+  coding_engines: {
+    opencode: boolean;
+    ollama: boolean;
+  };
   calendar_accessible: boolean;
   mail_accessible: boolean;
   notes_accessible: boolean;
@@ -19,9 +18,12 @@ interface StatusResponse {
   server_port: number;
   uptime_seconds: number;
   env_keys_set: {
-    anthropic: boolean;
-    fish_audio: boolean;
-    fish_voice_id: boolean;
+    groq: boolean;
+    gemini: boolean;
+    nvidia: boolean;
+    firecrawl?: boolean;
+    ollama?: boolean;
+    use_local_brain?: boolean;
     user_name: string;
   };
 }
@@ -32,18 +34,15 @@ interface PreferencesResponse {
   calendar_accounts: string;
 }
 
-// ---------------------------------------------------------------------------
-// State
-// ---------------------------------------------------------------------------
+interface ProviderTestResponse {
+  valid: boolean;
+  error?: string;
+}
 
 let panelEl: HTMLElement | null = null;
 let isOpen = false;
 let isFirstTimeSetup = false;
-let setupStep = 0; // 0=anthropic, 1=fish, 2=name, 3=done
-
-// ---------------------------------------------------------------------------
-// API helpers
-// ---------------------------------------------------------------------------
+let setupStep = 0; // 0=brains, 1=voice, 2=name, 3=done
 
 async function apiGet<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -59,10 +58,6 @@ async function apiPost<T>(url: string, body: unknown): Promise<T> {
   return res.json();
 }
 
-// ---------------------------------------------------------------------------
-// Panel HTML
-// ---------------------------------------------------------------------------
-
 function buildPanelHTML(): string {
   return `
     <div class="settings-backdrop" id="settings-backdrop"></div>
@@ -73,38 +68,46 @@ function buildPanelHTML(): string {
       </div>
 
       <div class="settings-welcome" id="settings-welcome" style="display:none">
-        <p>Welcome to JARVIS. Let's get you set up.</p>
+        <p>Welcome to JARVIS. Let's wire up the hybrid brain.</p>
       </div>
 
       <div class="settings-body">
-
-        <!-- API Keys -->
         <section class="settings-section" id="section-api-keys">
-          <h3>API Keys</h3>
+          <h3>Provider Keys</h3>
 
           <div class="settings-field">
-            <label>Anthropic API Key</label>
+            <label>Groq API Key</label>
             <div class="settings-input-row">
-              <input type="password" id="input-anthropic-key" placeholder="sk-ant-..." />
-              <button class="settings-btn" id="btn-test-anthropic">Test</button>
-              <span class="status-dot" id="status-anthropic"></span>
+              <input type="password" id="input-groq-key" placeholder="Groq key..." />
+              <button class="settings-btn" id="btn-test-groq">Test</button>
+              <span class="status-dot" id="status-groq"></span>
             </div>
           </div>
 
           <div class="settings-field">
-            <label>Fish Audio API Key</label>
+            <label>Gemini API Key</label>
             <div class="settings-input-row">
-              <input type="password" id="input-fish-key" placeholder="Fish Audio key..." />
-              <button class="settings-btn" id="btn-test-fish">Test</button>
-              <span class="status-dot" id="status-fish"></span>
+              <input type="password" id="input-gemini-key" placeholder="Gemini key..." />
+              <button class="settings-btn" id="btn-test-gemini">Test</button>
+              <span class="status-dot" id="status-gemini"></span>
             </div>
           </div>
 
           <div class="settings-field">
-            <label>Fish Voice ID</label>
+            <label>NVIDIA API Key (Optional)</label>
             <div class="settings-input-row">
-              <input type="text" id="input-fish-voice-id" placeholder="612b878b113047d9a770c069c8b4fdfe" />
-              <button class="settings-btn" id="btn-save-voice-id">Save</button>
+              <input type="password" id="input-nvidia-key" placeholder="NVIDIA key..." />
+              <button class="settings-btn" id="btn-test-nvidia">Test</button>
+              <span class="status-dot" id="status-nvidia"></span>
+            </div>
+          </div>
+
+          <div class="settings-field">
+            <label>Firecrawl API Key (Web Scraping - Optional)</label>
+            <div class="settings-input-row">
+              <input type="password" id="input-firecrawl-key" placeholder="Firecrawl key (fc-...)" />
+              <button class="settings-btn" id="btn-test-firecrawl">Test</button>
+              <span class="status-dot" id="status-firecrawl"></span>
             </div>
           </div>
 
@@ -113,11 +116,11 @@ function buildPanelHTML(): string {
           </div>
         </section>
 
-        <!-- Connection Status -->
         <section class="settings-section" id="section-status">
           <h3>Connection Status</h3>
           <div class="status-grid">
-            <div class="status-row"><span class="status-dot" id="status-claude-cli"></span><span>Claude Code CLI</span></div>
+            <div class="status-row"><span class="status-dot" id="status-opencode"></span><span>OpenCode</span></div>
+            <div class="status-row"><span class="status-dot" id="status-ollama"></span><span>Ollama</span></div>
             <div class="status-row"><span class="status-dot" id="status-calendar"></span><span>Apple Calendar</span></div>
             <div class="status-row"><span class="status-dot" id="status-mail"></span><span>Apple Mail</span></div>
             <div class="status-row"><span class="status-dot" id="status-notes"></span><span>Apple Notes</span></div>
@@ -125,7 +128,6 @@ function buildPanelHTML(): string {
           </div>
         </section>
 
-        <!-- User Preferences -->
         <section class="settings-section" id="section-preferences">
           <h3>User Preferences</h3>
 
@@ -153,7 +155,6 @@ function buildPanelHTML(): string {
           </div>
         </section>
 
-        <!-- System Info -->
         <section class="settings-section" id="section-sysinfo">
           <h3>System Info</h3>
           <div class="sysinfo-grid">
@@ -164,19 +165,13 @@ function buildPanelHTML(): string {
           </div>
         </section>
 
-        <!-- Setup Navigation (first-time only) -->
         <div class="setup-nav" id="setup-nav" style="display:none">
           <button class="settings-btn primary" id="btn-setup-next">Next</button>
         </div>
-
       </div>
     </div>
   `;
 }
-
-// ---------------------------------------------------------------------------
-// Panel lifecycle
-// ---------------------------------------------------------------------------
 
 function createPanel(): HTMLElement {
   const container = document.createElement("div");
@@ -201,11 +196,46 @@ function formatUptime(seconds: number): string {
   return `${h}h ${m}m`;
 }
 
+function providerKeyName(provider: string): string {
+  switch (provider) {
+    case "groq":
+      return "GROQ_API_KEY";
+    case "gemini":
+      return "GEMINI_API_KEY";
+    case "nvidia":
+      return "NVIDIA_API_KEY";
+    case "firecrawl":
+      return "FIRECRAWL_API_KEY";
+    default:
+      throw new Error(`Unsupported provider: ${provider}`);
+  }
+}
+
+function providerInputId(provider: string): string {
+  return `input-${provider}-key`;
+}
+
+async function testProvider(provider: "groq" | "gemini" | "nvidia" | "firecrawl", statusId: string) {
+  const input = document.getElementById(providerInputId(provider)) as HTMLInputElement | null;
+  const key = input?.value.trim() || "";
+  setDotStatus(statusId, "yellow");
+  try {
+    const result = await apiPost<ProviderTestResponse>("/api/settings/test-provider", {
+      provider,
+      key_value: key || undefined,
+    });
+    setDotStatus(statusId, result.valid ? "green" : "red");
+  } catch {
+    setDotStatus(statusId, "red");
+  }
+}
+
 async function loadStatus() {
   try {
     const status = await apiGet<StatusResponse>("/api/settings/status");
 
-    setDotStatus("status-claude-cli", status.claude_code_installed ? "green" : "red");
+    setDotStatus("status-opencode", status.coding_engines.opencode ? "green" : "red");
+    setDotStatus("status-ollama", status.coding_engines.ollama ? "green" : "red");
     setDotStatus("status-calendar", status.calendar_accessible ? "green" : "red");
     setDotStatus("status-mail", status.mail_accessible ? "green" : "red");
     setDotStatus("status-notes", status.notes_accessible ? "green" : "red");
@@ -214,11 +244,11 @@ async function loadStatus() {
     const serverDetail = document.getElementById("status-server-detail");
     if (serverDetail) serverDetail.textContent = `port ${status.server_port} | up ${formatUptime(status.uptime_seconds)}`;
 
-    // API key status dots
-    setDotStatus("status-anthropic", status.env_keys_set.anthropic ? "green" : "red");
-    setDotStatus("status-fish", status.env_keys_set.fish_audio ? "green" : "red");
+    setDotStatus("status-groq", status.env_keys_set.groq ? "green" : "red");
+    setDotStatus("status-gemini", status.env_keys_set.gemini ? "green" : "red");
+    setDotStatus("status-nvidia", status.env_keys_set.nvidia ? "green" : "off");
+    setDotStatus("status-firecrawl", status.env_keys_set.firecrawl ? "green" : "off");
 
-    // System info
     const memEl = document.getElementById("sysinfo-memory");
     if (memEl) memEl.textContent = String(status.memory_count);
     const taskEl = document.getElementById("sysinfo-tasks");
@@ -239,9 +269,9 @@ async function loadStatus() {
 async function loadPreferences() {
   try {
     const prefs = await apiGet<PreferencesResponse>("/api/settings/preferences");
-    const nameEl = document.getElementById("input-user-name") as HTMLInputElement;
-    const honEl = document.getElementById("input-honorific") as HTMLSelectElement;
-    const calEl = document.getElementById("input-calendar-accounts") as HTMLTextAreaElement;
+    const nameEl = document.getElementById("input-user-name") as HTMLInputElement | null;
+    const honEl = document.getElementById("input-honorific") as HTMLSelectElement | null;
+    const calEl = document.getElementById("input-calendar-accounts") as HTMLTextAreaElement | null;
     if (nameEl) nameEl.value = prefs.user_name || "";
     if (honEl) honEl.value = prefs.honorific || "sir";
     if (calEl) calEl.value = prefs.calendar_accounts || "auto";
@@ -251,72 +281,36 @@ async function loadPreferences() {
 }
 
 function wireEvents() {
-  // Close
   document.getElementById("settings-close")?.addEventListener("click", closeSettings);
   document.getElementById("settings-backdrop")?.addEventListener("click", closeSettings);
 
-  // Save keys
   document.getElementById("btn-save-keys")?.addEventListener("click", async () => {
-    const anthropicKey = (document.getElementById("input-anthropic-key") as HTMLInputElement).value.trim();
-    const fishKey = (document.getElementById("input-fish-key") as HTMLInputElement).value.trim();
-
-    if (anthropicKey) {
-      await apiPost("/api/settings/keys", { key_name: "ANTHROPIC_API_KEY", key_value: anthropicKey });
-    }
-    if (fishKey) {
-      await apiPost("/api/settings/keys", { key_name: "FISH_API_KEY", key_value: fishKey });
+    const providers = ["groq", "gemini", "nvidia", "firecrawl"] as const;
+    for (const provider of providers) {
+      const input = document.getElementById(providerInputId(provider)) as HTMLInputElement | null;
+      const value = input?.value.trim();
+      if (value) {
+        await apiPost("/api/settings/keys", { key_name: providerKeyName(provider), key_value: value });
+      }
     }
     await loadStatus();
   });
 
-  // Save voice ID
-  document.getElementById("btn-save-voice-id")?.addEventListener("click", async () => {
-    const voiceId = (document.getElementById("input-fish-voice-id") as HTMLInputElement).value.trim();
-    if (voiceId) {
-      await apiPost("/api/settings/keys", { key_name: "FISH_VOICE_ID", key_value: voiceId });
-    }
-  });
+  document.getElementById("btn-test-groq")?.addEventListener("click", async () => testProvider("groq", "status-groq"));
+  document.getElementById("btn-test-gemini")?.addEventListener("click", async () => testProvider("gemini", "status-gemini"));
+  document.getElementById("btn-test-nvidia")?.addEventListener("click", async () => testProvider("nvidia", "status-nvidia"));
+  document.getElementById("btn-test-firecrawl")?.addEventListener("click", async () => testProvider("firecrawl", "status-firecrawl"));
 
-  // Test Anthropic
-  document.getElementById("btn-test-anthropic")?.addEventListener("click", async () => {
-    setDotStatus("status-anthropic", "yellow");
-    const key = (document.getElementById("input-anthropic-key") as HTMLInputElement).value.trim();
-    try {
-      const result = await apiPost<{ valid: boolean; error?: string }>("/api/settings/test-anthropic", { key_value: key || undefined });
-      setDotStatus("status-anthropic", result.valid ? "green" : "red");
-    } catch {
-      setDotStatus("status-anthropic", "red");
-    }
-  });
-
-  // Test Fish
-  document.getElementById("btn-test-fish")?.addEventListener("click", async () => {
-    setDotStatus("status-fish", "yellow");
-    const key = (document.getElementById("input-fish-key") as HTMLInputElement).value.trim();
-    try {
-      const result = await apiPost<{ valid: boolean; error?: string }>("/api/settings/test-fish", { key_value: key || undefined });
-      setDotStatus("status-fish", result.valid ? "green" : "red");
-    } catch {
-      setDotStatus("status-fish", "red");
-    }
-  });
-
-  // Save preferences
   document.getElementById("btn-save-prefs")?.addEventListener("click", async () => {
-    const user_name = (document.getElementById("input-user-name") as HTMLInputElement).value.trim();
-    const honorific = (document.getElementById("input-honorific") as HTMLSelectElement).value;
-    const calendar_accounts = (document.getElementById("input-calendar-accounts") as HTMLTextAreaElement).value.trim();
+    const user_name = (document.getElementById("input-user-name") as HTMLInputElement | null)?.value.trim() || "";
+    const honorific = (document.getElementById("input-honorific") as HTMLSelectElement | null)?.value || "sir";
+    const calendar_accounts = (document.getElementById("input-calendar-accounts") as HTMLTextAreaElement | null)?.value.trim() || "auto";
     await apiPost("/api/settings/preferences", { user_name, honorific, calendar_accounts });
     await loadStatus();
   });
 
-  // Setup next button
   document.getElementById("btn-setup-next")?.addEventListener("click", advanceSetup);
 }
-
-// ---------------------------------------------------------------------------
-// First-time setup wizard
-// ---------------------------------------------------------------------------
 
 function enterSetupMode() {
   isFirstTimeSetup = true;
@@ -328,7 +322,6 @@ function enterSetupMode() {
   const nav = document.getElementById("setup-nav");
   if (nav) nav.style.display = "flex";
 
-  // Hide sections except API keys
   showSetupStep(0);
 }
 
@@ -345,39 +338,30 @@ function showSetupStep(step: number) {
   });
 
   const nextBtn = document.getElementById("btn-setup-next");
-  if (nextBtn) {
-    if (step === 0) nextBtn.textContent = "Next: Test Keys";
-    else if (step === 1) nextBtn.textContent = "Next: Set Your Name";
-    else if (step === 2) nextBtn.textContent = "Finish Setup";
-    else nextBtn.style.display = "none";
-  }
+  if (!nextBtn) return;
+  if (step === 0) nextBtn.textContent = "Next: Voice";
+  else if (step === 1) nextBtn.textContent = "Next: Your Name";
+  else if (step === 2) nextBtn.textContent = "Finish Setup";
+  else nextBtn.style.display = "none";
 }
 
 async function advanceSetup() {
   setupStep++;
   if (setupStep >= 3) {
-    // Done — save everything and close
     isFirstTimeSetup = false;
     const welcome = document.getElementById("settings-welcome");
     if (welcome) welcome.style.display = "none";
     const nav = document.getElementById("setup-nav");
     if (nav) nav.style.display = "none";
-
-    // Show all sections
     ["section-api-keys", "section-status", "section-preferences", "section-sysinfo"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.style.display = "";
     });
-
     closeSettings();
     return;
   }
   showSetupStep(setupStep);
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export async function openSettings() {
   if (isOpen) return;
@@ -389,18 +373,14 @@ export async function openSettings() {
   }
 
   panelEl.style.display = "block";
-
-  // Trigger animation
   requestAnimationFrame(() => {
     panelEl!.classList.add("open");
   });
 
-  // Load data
   const status = await loadStatus();
   await loadPreferences();
 
-  // Check for first-time setup
-  if (status && !status.env_keys_set.anthropic) {
+  if (status && !status.env_keys_set.use_local_brain && (!status.env_keys_set.groq || !status.env_keys_set.gemini)) {
     enterSetupMode();
   }
 }
@@ -418,18 +398,15 @@ export function isSettingsOpen(): boolean {
   return isOpen;
 }
 
-/**
- * Check if first-time setup is needed and auto-open.
- */
 export async function checkFirstTimeSetup(): Promise<boolean> {
   try {
     const status = await apiGet<StatusResponse>("/api/settings/status");
-    if (!status.env_keys_set.anthropic) {
+    if (!status.env_keys_set.use_local_brain && (!status.env_keys_set.groq || !status.env_keys_set.gemini)) {
       openSettings();
       return true;
     }
   } catch {
-    // Server not ready yet, skip
+    // Server not ready yet, skip.
   }
   return false;
 }
